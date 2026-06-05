@@ -1,8 +1,9 @@
 # Báo Cáo Lab 7: Embedding & Vector Store
 
-**Họ tên:** [Tên sinh viên]
-**Nhóm:** [Tên nhóm]
-**Ngày:** [Ngày nộp]
+**Họ tên:** Thái Thị Yến Nhi  
+**Mã học viên:** 2A202600783  
+**Nhóm:** 066  
+**Ngày:** 05/06/2026  
 
 ---
 
@@ -10,30 +11,41 @@
 
 ### Cosine Similarity (Ex 1.1)
 
-**High cosine similarity nghĩa là gì?**
-> *Viết 1-2 câu:*
+**High cosine similarity nghĩa là gì?**  
+High cosine similarity nghĩa là hai vector có hướng gần giống nhau trong không gian embedding. Với text embeddings, điều này thường cho thấy hai câu hoặc hai đoạn văn có ý nghĩa gần nhau, dù có thể không dùng chính xác cùng từ khóa.
 
 **Ví dụ HIGH similarity:**
-- Sentence A:
-- Sentence B:
-- Tại sao tương đồng:
+- Sentence A: Học viên được phép nghỉ tối đa 4 buổi trong chương trình.
+- Sentence B: Quy định chuyên cần cho phép học viên vắng tối đa bốn buổi.
+- Tại sao tương đồng: Hai câu cùng nói về giới hạn số buổi được nghỉ của học viên trong chương trình.
 
 **Ví dụ LOW similarity:**
-- Sentence A:
-- Sentence B:
-- Tại sao khác:
+- Sentence A: Học viên được nhận trợ cấp 8 triệu đồng mỗi tháng.
+- Sentence B: Vector store lưu embeddings để phục vụ semantic search.
+- Tại sao khác: Hai câu thuộc hai chủ đề khác nhau; một câu nói về chính sách trợ cấp, câu còn lại nói về kỹ thuật vector store.
 
-**Tại sao cosine similarity được ưu tiên hơn Euclidean distance cho text embeddings?**
-> *Viết 1-2 câu:*
+**Tại sao cosine similarity được ưu tiên hơn Euclidean distance cho text embeddings?**  
+Cosine similarity tập trung vào hướng của vector, nên phù hợp để đo mức độ gần nghĩa giữa các văn bản. Euclidean distance phụ thuộc nhiều hơn vào khoảng cách tuyệt đối và độ lớn vector, trong khi với text embeddings thì hướng biểu diễn ý nghĩa thường quan trọng hơn.
 
 ### Chunking Math (Ex 1.2)
 
-**Document 10,000 ký tự, chunk_size=500, overlap=50. Bao nhiêu chunks?**
-> *Trình bày phép tính:*
-> *Đáp án:*
+**Document 10,000 ký tự, chunk_size=500, overlap=50. Bao nhiêu chunks?**  
+Step size = chunk_size - overlap = 500 - 50 = 450.
 
-**Nếu overlap tăng lên 100, chunk count thay đổi thế nào? Tại sao muốn overlap nhiều hơn?**
-> *Viết 1-2 câu:*
+Công thức:
+`number_of_chunks = ceil((document_length - chunk_size) / step_size) + 1`
+
+Thay số:
+`ceil((10000 - 500) / 450) + 1 = ceil(9500 / 450) + 1 = 22 + 1 = 23`
+
+**Đáp án:** 23 chunks.
+
+**Nếu overlap tăng lên 100, chunk count thay đổi thế nào? Tại sao muốn overlap nhiều hơn?**  
+Khi overlap tăng lên 100, step size = 500 - 100 = 400.
+
+`ceil((10000 - 500) / 400) + 1 = ceil(9500 / 400) + 1 = 24 + 1 = 25`
+
+Vậy số chunk tăng từ 23 lên 25. Overlap nhiều hơn giúp giữ ngữ cảnh ở phần ranh giới giữa hai chunk, tránh mất ý khi một câu hoặc một đoạn bị chia cắt. Tuy nhiên overlap quá nhiều sẽ tạo nhiều nội dung trùng lặp hơn, tốn storage hơn và có thể làm retrieval bị nhiễu.
 
 ---
 
@@ -118,32 +130,36 @@ Giải thích cách tiếp cận của bạn khi implement các phần chính tr
 
 ### Chunking Functions
 
-**`SentenceChunker.chunk`** — approach:
-> *Viết 2-3 câu: dùng regex gì để detect sentence? Xử lý edge case nào?*
+**`SentenceChunker.chunk`** — approach:  
+Tôi dùng regex `(?<=[.!?])\s+` để tách văn bản tại khoảng trắng đứng sau dấu chấm, dấu chấm than hoặc dấu hỏi. Sau khi tách, tôi loại bỏ khoảng trắng thừa và bỏ các câu rỗng. Các câu sau đó được gom lại theo `max_sentences_per_chunk` để mỗi chunk chứa tối đa số câu được cấu hình.
 
-**`RecursiveChunker.chunk` / `_split`** — approach:
-> *Viết 2-3 câu: algorithm hoạt động thế nào? Base case là gì?*
+**`RecursiveChunker.chunk` / `_split`** — approach:  
+Tôi implement recursive chunking bằng cách thử các separator theo thứ tự từ lớn đến nhỏ: `\n\n`, `\n`, `. `, ` `, và cuối cùng là chuỗi rỗng `""`. Nếu đoạn hiện tại đã ngắn hơn hoặc bằng `chunk_size`, hàm trả về đoạn đó ngay. Nếu đoạn vẫn quá dài, thuật toán tiếp tục tách bằng separator tiếp theo; trường hợp cuối cùng thì cắt theo ký tự để đảm bảo không bị lỗi.
 
 ### EmbeddingStore
 
-**`add_documents` + `search`** — approach:
-> *Viết 2-3 câu: lưu trữ thế nào? Tính similarity ra sao?*
+**`add_documents` + `search`** — approach:  
+Tôi dùng in-memory list để lưu vector store. Mỗi record gồm `id`, `content`, `metadata` và `embedding`. Khi thêm document, store gọi embedding function để tạo vector từ `doc.content`; khi search, query cũng được embed rồi so sánh với từng document bằng cosine similarity, sau đó sort theo score giảm dần và trả về top-k kết quả.
 
-**`search_with_filter` + `delete_document`** — approach:
-> *Viết 2-3 câu: filter trước hay sau? Delete bằng cách nào?*
+**`search_with_filter` + `delete_document`** — approach:  
+Với `search_with_filter`, tôi lọc metadata trước rồi mới chạy similarity search trên các record còn lại. Cách này giúp giới hạn không gian tìm kiếm theo metadata như category, department hoặc language. Với `delete_document`, tôi xóa tất cả record có `metadata["doc_id"]` trùng với document id cần xóa và trả về `True` nếu có ít nhất một record bị xóa.
 
 ### KnowledgeBaseAgent
 
-**`answer`** — approach:
-> *Viết 2-3 câu: prompt structure? Cách inject context?*
+**`answer`** — approach:  
+Agent nhận câu hỏi, gọi `store.search(question, top_k)` để lấy các chunks liên quan nhất, rồi ghép nội dung retrieved được thành context. Prompt được xây theo cấu trúc gồm phần nguồn, câu hỏi và yêu cầu trả lời dựa trên nguồn. Cuối cùng agent gọi `llm_fn(prompt)` để sinh câu trả lời dựa trên retrieved context thay vì trả lời không có dữ liệu.
 
 ### Test Results
 
-```
-# Paste output of: pytest tests/ -v
+```text
+pytest tests/ -v
+
+collected 42 items
+
+42 passed in 0.06s
 ```
 
-**Số tests pass:** __ / __
+**Số tests pass:** 42 / 42
 
 ---
 
